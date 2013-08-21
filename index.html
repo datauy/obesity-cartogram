@@ -211,10 +211,7 @@
         parseHash();
       };
 
-      var segmentized = location.search === "?segmentized",
-          url = ["data",
-            segmentized ? "obesidad_en_el_mundo_segmentized.topojson" : "obesidad_en_el_mundo.topojson"
-          ].join("/");
+      var url = ["data", "obesidad_en_el_mundo.topojson"].join("/");
       d3.json(url, function(topo) {
         topology = topo;
         geometries = topology.objects.obesidad.geometries;
