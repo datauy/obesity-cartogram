@@ -193,13 +193,13 @@
           "scale(" + [scale, scale] + ")");
       }
 
-      var proj_mercator = d3.geo.equirectangular(),
+      var proj_equirectangular = d3.geo.equirectangular(),
           topology,
           geometries,
           rawData,
           dataById = {},
           carto = d3.cartogram()
-            .projection(proj_mercator)
+            .projection(proj_equirectangular)
             .properties(function(d) {
               return dataById[d.id];
             })
@@ -228,14 +228,14 @@
       function init() {
         var features = carto.features(topology, geometries),
             path = d3.geo.path()
-              .projection(proj_mercator);
+              .projection(proj_equirectangular);
 
         countries = countries.data(features)
           .enter()
           .append("path")
             .attr("class", "country")
             .attr("id", function(d) {
-              return d.properties.name;
+              return d.id;
             })
             .attr("fill", "#fafafa")
             .attr("d", path);
@@ -251,7 +251,7 @@
 
         var features = carto.features(topology, geometries),
             path = d3.geo.path()
-              .projection(proj_mercator);
+              .projection(proj_equirectangular);
 
         countries.data(features)
           .transition()
@@ -262,7 +262,7 @@
 
         countries.select("title")
           .text(function(d) {
-            return d.properties.name;
+            return d.id;
           });
       }
 
@@ -309,7 +309,7 @@
         countries.data(features)
           .select("title")
             .text(function(d) {
-              return [d.properties.NAME, fmt(value(d))].join(": ");
+              return [d.id, fmt(value(d))].join(": ");
             });
 
         countries.transition()
