@@ -107,7 +107,7 @@
       Basado en <a  href="https://github.com/shawnbot/d3-cartogram/">d3-cartograma.js</a> y con datos de <a href="http://www.theguardian.com/news/datablog/interactive/2013/mar/04/global-obesity-data-slope-graph-male-female-country">The Guardian</a>
     </div>
 
-    <a href="https://github.com/datauy/obesidad-cartogram/"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub"></a>
+    <a href="https://github.com/datauy/obesity-cartogram/"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub"></a>
   </div>
 
   <script>
@@ -193,13 +193,13 @@
           "scale(" + [scale, scale] + ")");
       }
 
-      var proj_mercator = d3.geo.equirectangular(),
+      var proj_equirectangular = d3.geo.equirectangular(),
           topology,
           geometries,
           rawData,
           dataById = {},
           carto = d3.cartogram()
-            .projection(proj_mercator)
+            .projection(proj_equirectangular)
             .properties(function(d) {
               return dataById[d.id];
             })
@@ -228,14 +228,14 @@
       function init() {
         var features = carto.features(topology, geometries),
             path = d3.geo.path()
-              .projection(proj_mercator);
+              .projection(proj_equirectangular);
 
         countries = countries.data(features)
           .enter()
           .append("path")
             .attr("class", "country")
             .attr("id", function(d) {
-              return d.properties.name;
+              return d.id;
             })
             .attr("fill", "#fafafa")
             .attr("d", path);
@@ -251,7 +251,7 @@
 
         var features = carto.features(topology, geometries),
             path = d3.geo.path()
-              .projection(proj_mercator);
+              .projection(proj_equirectangular);
 
         countries.data(features)
           .transition()
@@ -262,7 +262,7 @@
 
         countries.select("title")
           .text(function(d) {
-            return d.properties.name;
+            return d.id;
           });
       }
 
@@ -309,7 +309,7 @@
         countries.data(features)
           .select("title")
             .text(function(d) {
-              return [d.properties.NAME, fmt(value(d))].join(": ");
+              return [d.id, fmt(value(d))].join(": ");
             });
 
         countries.transition()
