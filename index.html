@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Mapa de Obesidad Mundial con Cartogram, d3 &amp; TopoJSON</title>
+    <title>Cartograms with d3 &amp; TopoJSON</title>
     <meta charset="utf-8">
     <meta property="og:image" content="placeholder.png">
-    <script src="http://d3js.org/d3.v3.js"></script>
+    <script src="http://d3js.org/d3.v3.min.js"></script>
     <script src="lib/colorbrewer.js"></script>
     <script src="lib/topojson.js"></script>
     <script src="lib/cartogram.js"></script>
@@ -37,80 +37,84 @@
         margin: 0 0 10px;
       }
 
-    form, form > * {
-      margin: 0;
-    }
+      form, form > * {
+        margin: 0;
+      }
 
-    #status {
-      color: #999;
-    }
+      #status {
+        color: #999;
+      }
 
-    #map-container {
-      height: 500px;
-      text-align: center;
-      position: relative;
-      margin: 20px 0;
-    }
+      #map-container {
+        height: 500px;
+        text-align: center;
+        position: relative;
+        margin: 20px 0;
+      }
 
-    #map {
-      display: block;
-      position: absolute;
-      background: #fff;
-      width: 100%;
-      height: 100%;
-      margin: 0;
-    }
+      #map {
+        display: block;
+        position: absolute;
+        background: #fff;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+      }
 
-    path.country {
-      stroke: #666;
-      stroke-width: .5;
-    }
+      path.state {
+        stroke: #666;
+        stroke-width: .5;
+      }
 
-    path.country:hover {
-      stroke: #000;
-    }
+      path.state:hover {
+        stroke: #000;
+      }
 
-    form {
-      font-size: 120%;
-    }
+      form {
+        font-size: 120%;
+      }
 
-    select {
-      font-size: inherit;
-    }
+      select {
+        font-size: inherit;
+      }
 
-    #placeholder {
-      position: absolute;
-      z-index: -1;
-      display: block;
-      left: 0;
-      top: 0;
-    }
+      #placeholder {
+        position: absolute;
+        z-index: -1;
+        display: block;
+        left: 0;
+        top: 0;
+      }
 
-  </style>
-</head>
-<body>
-  <div id="container">
-    <h1>Mapa de Obesidad Global con d3 &amp; TopoJSON</h1>
-    <form>
-      <p>
-        <label>Escalar por <select id="field"></select></label>
-        <label>en <select id="year"></select></label>
-        <span id="status"></span>
-      </p>
-    </form>
-    <div id="map-container">
-      <img id="placeholder" alt="placeholder image for old browsers" src="placeholder.png">
-      <svg id="map"></svg>
+    </style>
+  </head>
+  <body>
+    <div id="container">
+      <h1>Obesidad en el mundo en 2002, 2005 y 2010</h1>
+      <form>
+        <p>
+          <label>Escalar por <select id="field"></select></label>
+          <label>en <select id="year"></select></label>
+          <span id="status"></span>
+        </p>
+      </form>
+      <div id="map-container">
+        <img id="placeholder" alt="placeholder image for old browsers" src="placeholder.png">
+        <svg id="map"></svg>
+      </div>
+      <div id="about">
+        <h2>Sobre el proyecto</h2>
+        <p>Basado en los datos de <a href="">Guardian</a> y utilizando d3.js y cartogram.js</p>
+        <p><a href="cartogram.js">cartogram.js</a> es una implementación de
+        <a href="http://chrisman.scg.ulaval.ca/G360/dougenik.pdf">un algoritmo para construir cartogramas continuos</a>,
+        por James A. Dougenik, Nicholas R. Chrisman and Duane R. Niemeyer,
+        &copy;1985 por laAssociation of American Geographers. </p>
+
+      </div>
+
+      <a href="https://github.com/datauy/obesity-cartogram/"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub"></a>
     </div>
-    <div id="about">
-      <h2>Sobre el proyecto</h2>
-      Basado en <a  href="https://github.com/shawnbot/d3-cartogram/">d3-cartograma.js</a> y con datos de <a href="http://www.theguardian.com/news/datablog/interactive/2013/mar/04/global-obesity-data-slope-graph-male-female-country">The Guardian</a>
-    </div>
-
-    <a href="https://github.com/datauy/obesity-cartogram/"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub"></a>
-  </div>
-
-  <script>
+    <script>
 
       // hide the form if the browser doesn't do SVG,
       // (then just let everything else fail)
@@ -119,17 +123,17 @@
       }
 
       // field definitions from:
-      // http://www.theguardian.com/news/datablog/interactive/2013/mar/04/global-obesity-data-slope-graph-male-female-country
+      // <http://www.census.gov/popest/data/national/totals/2011/files/NST-EST2011-alldata.pdf>
       var percent = (function() {
             var fmt = d3.format(".2f");
             return function(n) { return fmt(n) + "%"; };
           })(),
           fields = [
-            {name: "(sin escala)", id: "none"},
-            {name: "Mujeres", id: "obinwomen", key: "mujeres_%d", years:[2002,2005,2010], format: percent},
-            {name: "Hombres", id: "obinmen", key: "hombres_%d", years:[2002,2005,2010], format: percent},
+            {name: "(no scale)", id: "none"},
+            {name: "Hombres", id: "hombres", key: "hombres_%d", years: [2002, 2005, 2010]},
+            {name: "Mujeres", id: "mujeres", key: "mujeres_%d", years: [2002, 2005, 2010]},
           ],
-          years = [2002,2005,2010],
+          years = [2002, 2005, 2010],
           fieldsById = d3.nest()
             .key(function(d) { return d.id; })
             .rollup(function(d) { return d[0]; })
@@ -169,9 +173,6 @@
           .attr("value", function(y) { return y; })
           .text(function(y) { return y; })
 
-      // get the svg map we have in the page
-      // add a group call layer in it
-      // add a group in it and get the path of the group, call it countries
       var map = d3.select("#map"),
           zoom = d3.behavior.zoom()
             .translate([-38, 32])
@@ -180,9 +181,10 @@
             .on("zoom", updateZoom),
           layer = map.append("g")
             .attr("id", "layer"),
-          countries = layer.append("g")
-            .attr("id", "countries")
+          states = layer.append("g")
+            .attr("id", "states")
             .selectAll("path");
+
       // map.call(zoom);
       updateZoom();
 
@@ -193,25 +195,28 @@
           "scale(" + [scale, scale] + ")");
       }
 
-      var proj_equirectangular = d3.geo.equirectangular(),
+      var proj = d3.geo.equirectangular(),
           topology,
           geometries,
           rawData,
           dataById = {},
           carto = d3.cartogram()
-            .projection(proj_equirectangular)
+            .projection(proj)
             .properties(function(d) {
               return dataById[d.id];
             })
             .value(function(d) {
-              return +d.properties[field];
+              return +d.properties[field] * 1000;
             });
 
       window.onhashchange = function() {
         parseHash();
       };
 
-      var url = ["data", "obesidad_en_el_mundo.topojson"].join("/");
+      var segmentized = location.search === "?segmentized",
+          url = ["data",
+            segmentized ? "obesidad_en_el_mundo.topojson" : "obesidad_en_el_mundo.topojson"
+          ].join("/");
       d3.json(url, function(topo) {
         topology = topo;
         geometries = topology.objects.obesidad.geometries;
@@ -228,19 +233,19 @@
       function init() {
         var features = carto.features(topology, geometries),
             path = d3.geo.path()
-              .projection(proj_equirectangular);
+              .projection(proj);
 
-        countries = countries.data(features)
+        states = states.data(features)
           .enter()
           .append("path")
-            .attr("class", "country")
+            .attr("class", "state")
             .attr("id", function(d) {
-              return d.id;
+              return d.properties.NAME;
             })
             .attr("fill", "#fafafa")
             .attr("d", path);
 
-        countries.append("title");
+        states.append("title");
 
         parseHash();
       }
@@ -251,18 +256,18 @@
 
         var features = carto.features(topology, geometries),
             path = d3.geo.path()
-              .projection(proj_equirectangular);
+              .projection(proj);
 
-        countries.data(features)
+        states.data(features)
           .transition()
             .duration(750)
             .ease("linear")
             .attr("fill", "#fafafa")
             .attr("d", path);
 
-        countries.select("title")
+        states.select("title")
           .text(function(d) {
-            return d.id;
+            return d.properties.NAME;
           });
       }
 
@@ -277,7 +282,7 @@
             value = function(d) {
               return +d.properties[key];
             },
-            values = countries.data()
+            values = states.data()
               .map(value)
               .filter(function(n) {
                 return !isNaN(n);
@@ -306,13 +311,13 @@
         var features = carto(topology, geometries).features;
 
         // update the data
-        countries.data(features)
+        states.data(features)
           .select("title")
             .text(function(d) {
-              return [d.id, fmt(value(d))].join(": ");
+              return [d.properties.NAME, fmt(value(d))].join(": ");
             });
 
-        countries.transition()
+        states.transition()
           .duration(750)
           .ease("linear")
           .attr("fill", function(d) {

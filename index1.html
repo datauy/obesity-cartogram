@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Mapa de Obesidad Mundial con Cartogram, d3 &amp; TopoJSON</title>
+    <meta charset="utf-8">
+    <meta property="og:image" content="placeholder.png">
+    <script src="http://d3js.org/d3.v3.js"></script>
+    <script src="lib/colorbrewer.js"></script>
+    <script src="lib/topojson.js"></script>
+    <script src="lib/cartogram.js"></script>
+    <style type="text/css">
+
+      body {
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-size: 14px;
+        line-height: 1.4em;
+        padding: 0;
+        margin: 0;
+      }
+
+      #container {
+        width: 800px;
+        margin: 20px auto;
+      }
+
+      h1 {
+        font-size: 200%;
+        margin: 0 0 15px 0;
+      }
+
+      h2 {
+        font-size: 160%;
+        margin: 0 0 10px 0;
+      }
+
+      p {
+        margin: 0 0 10px;
+      }
+
+    form, form > * {
+      margin: 0;
+    }
+
+    #status {
+      color: #999;
+    }
+
+    #map-container {
+      height: 500px;
+      text-align: center;
+      position: relative;
+      margin: 20px 0;
+    }
+
+    #map {
+      display: block;
+      position: absolute;
+      background: #fff;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+
+    path.country {
+      stroke: #666;
+      stroke-width: .5;
+    }
+
+    path.country:hover {
+      stroke: #000;
+    }
+
+    form {
+      font-size: 120%;
+    }
+
+    select {
+      font-size: inherit;
+    }
+
+    #placeholder {
+      position: absolute;
+      z-index: -1;
+      display: block;
+      left: 0;
+      top: 0;
+    }
+
+  </style>
+</head>
+<body>
+  <div id="container">
+    <h1>Mapa de Obesidad Global con d3 &amp; TopoJSON</h1>
+    <form>
+      <p>
+        <label>Escalar por <select id="field"></select></label>
+        <label>en <select id="year"></select></label>
+        <span id="status"></span>
+      </p>
+    </form>
+    <div id="map-container">
+      <img id="placeholder" alt="placeholder image for old browsers" src="placeholder.png">
+      <svg id="map"></svg>
+    </div>
+    <div id="about">
+      <h2>Sobre el proyecto</h2>
+      Basado en <a  href="https://github.com/shawnbot/d3-cartogram/">d3-cartograma.js</a> y con datos de <a href="http://www.theguardian.com/news/datablog/interactive/2013/mar/04/global-obesity-data-slope-graph-male-female-country">The Guardian</a>
+    </div>
+
+    <a href="https://github.com/datauy/obesity-cartogram/"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub"></a>
+  </div>
+
+  <script>
+
+      // hide the form if the browser doesn't do SVG,
+      // (then just let everything else fail)
+      if (!document.createElementNS) {
+        document.getElementsByTagName("form")[0].style.display = "none";
+      }
+
+     // field definitions from:
+     // http://www.theguardian.com/news/datablog/interactive/2013/mar/04/global-obesity-data-slope-graph-male-female-country
+     var percent = (function() {
+           var fmt = d3.format(".2f");
+           return function(n) { return fmt(n) + "%"; };
+         })(),
+         fields = [
+           {name: "(sin escala)", id: "none"},
+           {name: "Mujeres", id: "obinwomen", key: "mujeres_%d", years:[2002,2005,2010]},
+         ],
+         years = [2002,2005,2010],
+         fieldsById = d3.nest()
+           .key(function(d) { return d.id; })
+           .rollup(function(d) { return d[0]; })
+           .map(fields),
+         field = fields[0],
+         year = years[0],
+         colors = colorbrewer.RdYlBu[3]
+           .reverse()
+           .map(function(rgb) { return d3.hsl(rgb); });
+
+     var body = d3.select("body"),
+         stat = d3.select("#status");
+
+     var fieldSelect = d3.select("#field")
+       .on("change", function(e) {
+         field = fields[this.selectedIndex];
+         location.hash = "#" + [field.id, year].join("/");
+       });
+
+     fieldSelect.selectAll("option")
+       .data(fields)
+       .enter()
+       .append("option")
+         .attr("value", function(d) { return d.id; })
+         .text(function(d) { return d.name; });
+
+     var yearSelect = d3.select("#year")
+       .on("change", function(e) {
+         year = years[this.selectedIndex];
+         location.hash = "#" + [field.id, year].join("/");
+       });
+
+     yearSelect.selectAll("option")
+       .data(years)
+       .enter()
+       .append("option")
+         .attr("value", function(y) { return y; })
+         .text(function(y) { return y; })
+
+     // get the svg map we have in the page
+     // add a group call layer in it
+     // add a group in it and get the path of the group, call it countries
+     var map = d3.select("#map"),
+         zoom = d3.behavior.zoom()
+           .translate([-38, 32])
+           .scale(.94)
+           .scaleExtent([0.5, 10.0])
+           .on("zoom", updateZoom),
+         layer = map.append("g")
+           .attr("id", "layer"),
+         countries = layer.append("g")
+           .attr("id", "countries")
+           .selectAll("path");
+     // map.call(zoom);
+     updateZoom();
+
+     function updateZoom() {
+       var scale = zoom.scale();
+       layer.attr("transform",
+         "translate(" + zoom.translate() + ") " +
+         "scale(" + [scale, scale] + ")");
+     }
+
+     var proj_equirectangular = d3.geo.equirectangular(),
+         topology,
+         geometries,
+         rawData,
+         dataById = {},
+         carto = d3.cartogram()
+           .projection(proj_equirectangular)
+           .properties(function(d) {
+             return dataById[d.id];
+           })
+           .value(function(d) {
+             return +d.properties[field] * 100;
+           });
+
+     window.onhashchange = function() {
+       parseHash();
+     };
+
+     var url = ["data", "obesidad_en_el_mundo.topojson"].join("/");
+     d3.json(url, function(topo) {
+       topology = topo;
+       geometries = topology.objects.obesidad.geometries;
+       d3.csv("data/obesidad_en_el_mundo.csv", function(data) {
+         rawData = data;
+         dataById = d3.nest()
+           .key(function(d) { return d.name; })
+           .rollup(function(d) { return d[0]; })
+           .map(data);
+         init();
+       });
+     });
+
+     function init() {
+       var features = carto.features(topology, geometries),
+           path = d3.geo.path()
+             .projection(proj_equirectangular);
+
+       countries = countries.data(features)
+         .enter()
+         .append("path")
+           .attr("class", "country")
+           .attr("id", function(d) {
+             return d.id;
+           })
+           .attr("fill", "#fafafa")
+           .attr("d", path);
+
+       countries.append("title");
+
+       parseHash();
+     }
+
+     function reset() {
+       stat.text("");
+       body.classed("updating", false);
+
+       var features = carto.features(topology, geometries),
+           path = d3.geo.path()
+             .projection(proj_equirectangular);
+
+       countries.data(features)
+         .transition()
+           .duration(750)
+           .ease("linear")
+           .attr("fill", "#fafafa")
+           .attr("d", path);
+
+       countries.select("title")
+         .text(function(d) {
+           return d.id;
+         });
+     }
+
+     function update() {
+       var start = Date.now();
+       body.classed("updating", true);
+
+       var key = field.key.replace("%d", year),
+           fmt = (typeof field.format === "function")
+             ? field.format
+             : d3.format(field.format || ","),
+           value = function(d) {
+             return +d.properties[key];
+           },
+           values = countries.data()
+             .map(value)
+             .filter(function(n) {
+               return !isNaN(n);
+             })
+             .sort(d3.ascending),
+           lo = values[0],
+           hi = values[values.length - 1];
+
+       var color = d3.scale.linear()
+         .range(colors)
+         .domain(lo < 0
+           ? [lo, 0, hi]
+           : [lo, d3.mean(values), hi]);
+
+       // normalize the scale to positive numbers
+       var scale = d3.scale.linear()
+         .domain([lo, hi])
+         .range([1, 1000]);
+
+       // tell the cartogram to use the scaled values
+       carto.value(function(d) {
+         return scale(value(d));
+       });
+
+       // generate the new features, pre-projected
+       var features = carto(topology, geometries).features;
+
+       // update the data
+       countries.data(features)
+         .select("title")
+           .text(function(d) {
+             return [d.id, fmt(value(d))].join(": ");
+           });
+
+       countries.transition()
+         .duration(750)
+         .ease("linear")
+         .attr("fill", function(d) {
+           return color(value(d));
+         })
+         .attr("d", carto.path);
+
+       var delta = (Date.now() - start) / 1000;
+       stat.text(["calculated in", delta.toFixed(1), "seconds"].join(" "));
+       body.classed("updating", false);
+     }
+
+     var deferredUpdate = (function() {
+       var timeout;
+       return function() {
+         var args = arguments;
+         clearTimeout(timeout);
+         stat.text("calculating...");
+         return timeout = setTimeout(function() {
+           update.apply(null, arguments);
+         }, 10);
+       };
+     })();
+
+     var hashish = d3.selectAll("a.hashish")
+       .datum(function() {
+         return this.href;
+       });
+
+     function parseHash() {
+       var parts = location.hash.substr(1).split("/"),
+           desiredFieldId = parts[0],
+           desiredYear = +parts[1];
+
+       field = fieldsById[desiredFieldId] || fields[0];
+       year = (years.indexOf(desiredYear) > -1) ? desiredYear : years[0];
+
+       fieldSelect.property("selectedIndex", fields.indexOf(field));
+
+       if (field.id === "none") {
+
+         yearSelect.attr("disabled", "disabled");
+         reset();
+
+       } else {
+
+         if (field.years) {
+           if (field.years.indexOf(year) === -1) {
+             year = field.years[0];
+           }
+           yearSelect.selectAll("option")
+             .attr("disabled", function(y) {
+               return (field.years.indexOf(y) === -1) ? "disabled" : null;
+             });
+         } else {
+           yearSelect.selectAll("option")
+             .attr("disabled", null);
+         }
+
+         yearSelect
+           .property("selectedIndex", years.indexOf(year))
+           .attr("disabled", null);
+
+         deferredUpdate();
+         location.replace("#" + [field.id, year].join("/"));
+
+         hashish.attr("href", function(href) {
+           return href + location.hash;
+         });
+       }
+     }
+
+    </script>
+  </body>
+</html>
